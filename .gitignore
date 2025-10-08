@@ -41,7 +41,7 @@
 *.asv
 *.png
 *.mp4
-# *.mat
+*.mat
 *.pdf
 *.webp
 
