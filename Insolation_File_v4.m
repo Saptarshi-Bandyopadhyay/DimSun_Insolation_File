@@ -1,9 +1,9 @@
 % Solar Incidence on Earth with and without Dust Cloud
 
-close all, 
+close all,
 clear all, clc
 
-tic
+tic % Start stopwatch timer - measures time for code exection
 
 %% Pre-Set Constants
 
@@ -27,8 +27,8 @@ speed_light = 2.99792458e8; % [m/s]
 
 flag_file_location = 1;
 
-path_to_MuSCAT_Supporting_Files = '../MuSCAT_Supporting_Files/'; 
-path_to_MuSCAT_v2 = '../muscat/'; 
+path_to_MuSCAT_Supporting_Files = '../MuSCAT_Supporting_Files/';
+path_to_MuSCAT_v2 = '../MuSCAT_Matlab_v2/';
 
 addpath(genpath(path_to_MuSCAT_Supporting_Files));
 addpath(genpath(path_to_MuSCAT_v2));
@@ -38,7 +38,7 @@ cspice_furnsh([path_to_MuSCAT_Supporting_Files,'SPICE/pck00011.tpc']);
 
 %% Initialize Simulation
 
-time_utc = '2025-12-21T06:00:00'; % this_time_utc
+time_utc = '2025-12-21T12:00:00'; % this_time_utc
 
 num_rays = 1e6; % this_num_rays
 
@@ -107,6 +107,7 @@ elseif 1 + dot(primary_vector, desired_primary_vector) <= 1e-10
     warning('Rotation_matrix_ray is Badly computed!')
 
 else
+    % Rodrigues' formula assuming two unit and opposite vectors
     v = cross(primary_vector, desired_primary_vector);
     Rotation_matrix_ray = eye(3) + skew(v) + skew(v)^2*(1/(1+dot(primary_vector, desired_primary_vector)));
 
@@ -118,7 +119,7 @@ end
 
 %% Ray Tracing
 
-flag_Sun_ray_generator = 'uniformly random';
+flag_Sun_ray_generator = 'limb darkening';
 
 for i=1:1:num_rays
 
@@ -176,6 +177,54 @@ for i=1:1:num_rays
             y2 = radius_location*yr2; % [km]
             z2 = radius_location*zr2; % [km]
 
+        case 'limb darkening'
+
+            x1 = 0; % [km] start at Sun center in x
+
+            flag_rand_variables = 0;
+            while flag_rand_variables == 0
+                % Pick a random point in unit circle
+                yr1 = 2*(rand-0.5);
+                zr1 = 2*(rand-0.5);
+                r_norm = norm([yr1 zr1]);
+
+                if r_norm < 1
+
+                    % Reject dimmer rays
+                    u = 0.5; % limb darkening coefficient
+                    mu = sqrt(1 - r_norm^2);
+                    intensity = 1 - u*(1 - mu); % brightness factor
+
+                    % Rejection sampling - keep rays probability proportional to intensity
+                    if rand > intensity
+                        flag_rand_variables = 1;
+                    else
+                        flag_rand_variables = 0; % reject dimmer rays at the limb
+                    end
+                end
+            end
+
+
+            % Scale to true solar radius
+            y1 = radius_Sun*yr1;
+            z1 = radius_Sun*zr1;
+
+            % Ray at L1 remains same as uniform
+            x2 = x_location; % [km]
+            flag_rand_variables = 0;
+            while flag_rand_variables == 0
+                yr2 = 2*(rand-0.5);
+                zr2 = 2*(rand-0.5);
+                if norm([yr2 zr2]) < 1
+                    flag_rand_variables = 1;
+                end
+            end
+            y2 = radius_location*yr2; % [km]
+            z2 = radius_location*zr2; % [km]
+
+            % Save ray intensity for later use
+            all_rays_array(i,15) = intensity;
+
         otherwise
 
             error('Ray generator is not defined!')
@@ -194,7 +243,7 @@ for i=1:1:num_rays
     y3 = (y2 - y1)*(x3 - x1)/(x2 - x1) + y1; % [km]
     z3 = (z2 - z1)*(x3 - x1)/(x2 - x1) + z1; % [km]
 
-    all_rays_array(i,3:11) = [x1 y1 z1 x2 y2 z2 x3 y3 z3]; 
+    all_rays_array(i,3:11) = [x1 y1 z1 x2 y2 z2 x3 y3 z3];
 
     if (norm([y3 z3])/radius_Earth) <= 1
         % Yes
@@ -212,7 +261,7 @@ for i=1:1:num_rays
         % else
         %     error('t is wrong!')
         % end
-       
+
         % Intersection with Earth's Sphere (using quadratic equation)
 
         A = (x2 - x3)^2 + (y2 - y3)^2 + (z2 - z3)^2;
@@ -226,7 +275,7 @@ for i=1:1:num_rays
 
         Sphere_Intersect_point_ray = t*[x2 y2 z2] + (1-t)*[x3 y3 z3];
 
-        all_rays_array(i,12:14) = Sphere_Intersect_point_ray;   
+        all_rays_array(i,12:14) = Sphere_Intersect_point_ray;
 
         % % Earth Intersect Point in J2000 frame
         % Sphere_Intersect_point_J2000 = (Rotation_matrix_ray * Sphere_Intersect_point_ray')'; % [km]
@@ -277,7 +326,9 @@ for i = 1:1:num_rays
 
 end
 
-toc
+toc % Stop stopwatch timer
+
+% Save rays data
 
 % save(['all_data_',num2str(num_rays),'_',time_utc,'.mat'])
 save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
@@ -293,14 +344,22 @@ set(plot_handle,'PaperPositionMode','auto');
 
 hold on
 
+% Plot latitude/longitude of rays that hit Earth without passing through the dust cloud (red dots)
+
 idx_Earth = logical( (all_rays_array(:,2) == 1) & (all_rays_array(:,1) == 0) );
 plot(all_rays_lat_long(idx_Earth,2), all_rays_lat_long(idx_Earth,1), '.r')
+
+% Plot latitude/longitude of rays that hit Earth AND passed through the dust cloud (blue dots)
 
 idx_Earth = logical( (all_rays_array(:,2) == 1) & (all_rays_array(:,1) == 1) );
 plot(all_rays_lat_long(idx_Earth,2), all_rays_lat_long(idx_Earth,1), '.b')
 
+% Load coastline data for map overlay
+
 load coastlines.mat
 plot(coastlon, coastlat, 'k','LineWidth',2)
+
+% Format map visualization properties
 
 grid on
 axis equal
@@ -313,6 +372,100 @@ ylabel('Latitude [deg]')
 title(['Date = ',time_utc])
 set(gca,'FontSize',15, 'FontName','Times New Roman')
 
+% Save image
+
 % saveas(plot_handle,['Rays_',num2str(num_rays),'_',time_utc,'.png'])
 saveas(plot_handle,replace(['Rays_',num2str(num_rays),'_',time_utc,'.png'],':','_'))
 
+%% Dust vs non-dust rays on Mercator map with 10x10° grid
+fprintf('\n Dust vs non-dust rays on Mercator map with 10x10° grid \n');
+
+idx_hit = (all_rays_array(:,2) == 1);
+idx_dust = (all_rays_array(:,1) == 1);
+idx_hit_dust = idx_hit & idx_dust;
+idx_hit_nodust = idx_hit & ~idx_dust;
+
+% Extract coordinates
+lat_hit = all_rays_lat_long(idx_hit,1);
+lon_hit = all_rays_lat_long(idx_hit,2);
+lat_dust = all_rays_lat_long(idx_hit_dust,1);
+lon_dust = all_rays_lat_long(idx_hit_dust,2);
+lat_nodust = all_rays_lat_long(idx_hit_nodust,1);
+lon_nodust = all_rays_lat_long(idx_hit_nodust,2);
+
+% Define 10x10° grid edges and centers
+lon_edges = -180:10:180;
+lat_edges = -90:10:90;
+lon_centers = lon_edges(1:end-1) + diff(lon_edges)/2;
+lat_centers = lat_edges(1:end-1) + diff(lat_edges)/2;
+
+% Ray count
+[counts_total, ~, ~] = histcounts2(lat_hit, lon_hit, lat_edges, lon_edges);
+[counts_dust, ~, ~]  = histcounts2(lat_dust, lon_dust, lat_edges, lon_edges);
+
+% Load background map
+I = imread('earth.png');
+
+% Create figure
+fig3 = figure('Name','Ray Tracing with Dust Cloud on Mercator Map','Color',[1 1 1]);
+set(fig3,'units','normalized','outerposition',[0.4 0 0.6 0.65])
+ax = gca; hold on
+
+% Background map
+if ~isempty(I)
+    imagesc([-180 180], [-90 90], flipud(I));
+    set(ax,'YDir','normal');
+else
+    xlim([-180 180]); ylim([-90 90]);
+end
+
+% Overlay heatmap of total rays per cell
+h_counts = imagesc([-180 180], [-90 90], counts_total);
+set(ax,'YDir','normal');
+alpha(h_counts, 0.35);
+colormap(parula)
+colorbar
+caxis([0 max(counts_total(:))]);
+title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
+axis equal
+xlim([-180 180]); ylim([-90 90]);
+
+% Plot the rays
+plot(lon_nodust, lat_nodust, '.r', 'MarkerSize', 4);
+plot(lon_dust, lat_dust, '.b', 'MarkerSize', 4);
+
+% Overlay 10° white grid
+for lonV = lon_edges
+    plot([lonV lonV], [-90 90], 'w', 'LineWidth', 0.5);
+end
+for latH = lat_edges
+    plot([-180 180], [latH latH], 'w', 'LineWidth', 0.5);
+end
+
+% Annotate number of rays per cell (counts_total)
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+        n = counts_total(r,c);
+        if n > 0 % Zeros are skipped
+            ndust = counts_dust(r,c);
+            text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
+                'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+                'FontSize',7, 'FontWeight','bold', 'Color','w', ...
+                'BackgroundColor',[0 0 0 0.4], 'Margin',1);
+        end
+    end
+end
+
+legend({'No Dust Cloud','Through Dust Cloud'}, 'Location','southoutside', 'Orientation','horizontal');
+grid on
+set(gca,'FontSize',14,'FontName','Times New Roman');
+
+% Save figure
+saveas(fig3, replace(['Rays_Mercator_Count_',num2str(num_rays),'_',time_utc,'.png'],':','_'));
+
+% Print summary
+fprintf('Total rays that hit Earth: %d\n', sum(idx_hit));
+fprintf('  → Through dust cloud: %d\n', sum(idx_hit_dust));
+fprintf('  → Without dust cloud: %d\n', sum(idx_hit_nodust));
