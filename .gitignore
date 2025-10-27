@@ -42,7 +42,7 @@
 *.png
 *.mp4
 *.mat
-*.pdf
+# *.pdf
 *.webp
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
