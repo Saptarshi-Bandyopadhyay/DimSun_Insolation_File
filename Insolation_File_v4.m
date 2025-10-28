@@ -85,7 +85,9 @@ temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 
 radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
-radius_dust_cloud = 2.2089e+03; % [km] From Dust_Cloud_Mass_Marks_Equations.m, line 502
+% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in ray intensity by 10.3219%  
+
+radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in ray intensity by 100%  
 
 %% Rotation Matrix for Ray
 
@@ -232,7 +234,7 @@ for i=1:1:num_rays
     end
 
     % Does the ray pass through Dust Cloud
-    if norm([y2 z2]) <= radius_dust_cloud
+    if norm([y2 z2]) <= radius_obstruction
         % Yes
         all_rays_array(i,1) = 1;
     end
@@ -426,7 +428,8 @@ alpha(h_counts, 0.35);
 colormap(parula)
 colorbar
 caxis([0 max(counts_total(:))]);
-title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+% title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Rays hitting Earth with an Obstruction Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
 xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
 axis equal
 xlim([-180 180]); ylim([-90 90]);
@@ -463,7 +466,7 @@ grid on
 set(gca,'FontSize',14,'FontName','Times New Roman');
 
 % Save figure
-saveas(fig3, replace(['Rays_Mercator_Count_',num2str(num_rays),'_',time_utc,'.png'],':','_'));
+saveas(fig3, replace(['Mercator_Rays_',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
 
 % Print summary
 fprintf('Total rays that hit Earth: %d\n', sum(idx_hit));
