@@ -85,9 +85,9 @@ temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 
 radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
-% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in ray intensity by 10.3219%  
+% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 10.3219%  
 
-radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in ray intensity by 100%  
+radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%  
 
 %% Rotation Matrix for Ray
 
@@ -376,8 +376,7 @@ set(gca,'FontSize',15, 'FontName','Times New Roman')
 
 % Save image
 
-% saveas(plot_handle,['Rays_',num2str(num_rays),'_',time_utc,'.png'])
-saveas(plot_handle,replace(['Rays_',num2str(num_rays),'_',time_utc,'.png'],':','_'))
+% saveas(plot_handle,replace(['Rays_',num2str(num_rays),'_',time_utc,'.png'],':','_'))
 
 %% Dust vs non-dust rays on Mercator map with 10x10° grid
 fprintf('\n Dust vs non-dust rays on Mercator map with 10x10° grid \n');
