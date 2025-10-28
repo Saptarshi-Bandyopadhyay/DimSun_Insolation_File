@@ -43,7 +43,7 @@ time_utc = '2025-12-21T12:00:00'; % this_time_utc
 num_rays = 1e6; % this_num_rays
 
 % save(['all_data_',num2str(num_rays),'_',time_utc,'.mat'])
-save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
+% save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
 
 all_rays_array = zeros(num_rays,14); % [Boolean hits Dust Cloud, Boolean hits Earth, [x1 y1 z1], [x2 y2 z2], [x3 y3 z3], [x4 y4 z4] ]
 
