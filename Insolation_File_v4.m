@@ -333,7 +333,7 @@ toc % Stop stopwatch timer
 % Save rays data
 
 % save(['all_data_',num2str(num_rays),'_',time_utc,'.mat'])
-save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
+% save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
 
 %% Plot World Map
 
