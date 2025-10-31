@@ -468,7 +468,7 @@ for r = 1:length(lat_centers)
     end
 end
 
-legend({'No Dust Cloud','Through Dust Cloud'}, 'Location','southoutside', 'Orientation','horizontal');
+legend({'No Obstruction','Through Obstruction'}, 'Location','southoutside', 'Orientation','horizontal');
 grid on
 set(gca,'FontSize',14,'FontName','Times New Roman');
 
@@ -477,8 +477,8 @@ saveas(fig3, replace(['Mercator_Rays_',num2str(num_rays),'_Radius_',num2str(roun
 
 % Print summary
 fprintf('Total rays that hit Earth: %d\n', sum(idx_hit));
-fprintf('  → Through dust cloud: %d\n', sum(idx_hit_dust));
-fprintf('  → Without dust cloud: %d\n', sum(idx_hit_nodust));
+fprintf('  → Through Obstruction: %d\n', sum(idx_hit_dust));
+fprintf('  → Without Obstruction: %d\n', sum(idx_hit_nodust));
 
 %% Plot Intensity
 
@@ -505,7 +505,9 @@ intensity_total = energy_per_ray * counts_total ./area_grid_cells; % [W/m^2]
 
 intensity_SRM = (energy_per_ray * counts_nodust ./area_grid_cells) + (energy_per_ray * factor_dimming_obstruction * counts_dust ./area_grid_cells); % [W/m^2]
 
-intensity_diff = intensity_total - intensity_SRM; % [W/m^2]
+intensity_reduction_SRM = intensity_total - intensity_SRM; % [W/m^2]
+
+fraction_intensity_reduction_SRM = 100*intensity_reduction_SRM ./intensity_total; % [percentage]
 
 % Create figure
 fig3 = figure('Name','Solar Intensity without Obstruction','Color',[1 1 1]);
@@ -624,7 +626,7 @@ saveas(fig3, replace(['Intensity_with_SRM_Obstruction_Rays',num2str(num_rays),'_
 
 
 % Create figure
-fig3 = figure('Name','Solar Intensity Difference due to SRM Obstruction','Color',[1 1 1]);
+fig3 = figure('Name','Solar Intensity Reduction due to SRM Obstruction','Color',[1 1 1]);
 clc
 set(fig3,'units','normalized','outerposition',[0 0.3 0.6 0.65])
 ax = gca; hold on
@@ -638,16 +640,16 @@ else
 end
 
 % Overlay heatmap of total rays per cell
-h_counts = imagesc([-180 180], [-90 90], intensity_diff);
+h_counts = imagesc([-180 180], [-90 90], intensity_reduction_SRM);
 set(ax,'YDir','normal');
 alpha(h_counts, 0.35);
 colormap(parula)
 a = colorbar;
-a.Label.String = 'Solar Intensity [W/m^2]';
-caxis([0 max(intensity_diff(:))]);
+a.Label.String = 'Solar Intensity Reduction [W/m^2]';
+caxis([0 max(intensity_reduction_SRM(:))]);
 
 % title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
-title(['Date = ',time_utc,', Solar Intensity Difference due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Intensity Reduction due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
 xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
 axis equal
 xlim([-180 180]); ylim([-90 90]);
@@ -664,7 +666,7 @@ end
 
 for r = 1:length(lat_centers)
     for c = 1:length(lon_centers)
-        n = round(intensity_diff(r,c));
+        n = round(intensity_reduction_SRM(r,c));
         if n > 0 % Zeros are skipped
             ndust = counts_dust(r,c);
             text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
@@ -678,4 +680,62 @@ end
 set(gca,'FontSize',14, 'FontName','Times New Roman')
 
 % Save figure
-saveas(fig3, replace(['Intensity_with_SRM_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
+saveas(fig3, replace(['Intensity_Reduction_with_SRM_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
+
+
+% Create figure
+fig3 = figure('Name','Fraction Solar Intensity Reduction due to SRM Obstruction','Color',[1 1 1]);
+clc
+set(fig3,'units','normalized','outerposition',[0.4 0.3 0.6 0.65])
+ax = gca; hold on
+
+% Background map
+if ~isempty(I)
+    imagesc([-180 180], [-90 90], flipud(I));
+    set(ax,'YDir','normal');
+else
+    xlim([-180 180]); ylim([-90 90]);
+end
+
+% Overlay heatmap of total rays per cell
+h_counts = imagesc([-180 180], [-90 90], fraction_intensity_reduction_SRM);
+set(ax,'YDir','normal');
+alpha(h_counts, 0.35);
+colormap(parula)
+a = colorbar;
+a.Label.String = 'Fraction Solar Intensity Reduction [%]';
+caxis([0 max(fraction_intensity_reduction_SRM(:))]);
+
+% title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Intensity Reduction due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
+axis equal
+xlim([-180 180]); ylim([-90 90]);
+
+% Overlay 10° white grid
+for lonV = lon_edges
+    plot([lonV lonV], [-90 90], 'w', 'LineWidth', 0.5);
+end
+for latH = lat_edges
+    plot([-180 180], [latH latH], 'w', 'LineWidth', 0.5);
+end
+
+% Annotate number of rays per cell (counts_total)
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+        n = round(fraction_intensity_reduction_SRM(r,c),1);
+        if n > 0 % Zeros are skipped
+            ndust = counts_dust(r,c);
+            text(lon_centers(c), lat_centers(r), sprintf('%s', num2str(n)), ...
+                'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+                'FontSize',7, 'FontWeight','bold', 'Color','w', ...
+                'BackgroundColor',[0 0 0 0.4], 'Margin',1);
+        end
+    end
+end
+
+set(gca,'FontSize',14, 'FontName','Times New Roman')
+
+% Save figure
+saveas(fig3, replace(['Fraction_Intensity_Reduction_with_SRM_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
