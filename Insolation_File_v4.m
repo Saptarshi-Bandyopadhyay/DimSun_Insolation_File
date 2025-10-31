@@ -40,7 +40,7 @@ cspice_furnsh([path_to_MuSCAT_Supporting_Files,'SPICE/pck00011.tpc']);
 
 time_utc = '2025-12-21T12:00:00'; % this_time_utc
 
-num_rays = 1e6; % this_num_rays
+num_rays = 1e7; % this_num_rays
 
 % save(['all_data_',num2str(num_rays),'_',time_utc,'.mat'])
 % save(replace(['all_data_',num2str(num_rays),'_',time_utc,'.mat'],':','_'))
@@ -86,8 +86,10 @@ temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
 % radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 10.3219%  
+% factor_dimming_obstruction = 1 - 0.103219;
 
 radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%  
+factor_dimming_obstruction = 0;
 
 %% Rotation Matrix for Ray
 
@@ -125,7 +127,7 @@ flag_Sun_ray_generator = 'limb darkening';
 
 for i=1:1:num_rays
 
-    if mod(i, 100) == 0
+    if mod(100*i, num_rays) == 0
         disp(i)
     end
 
@@ -385,6 +387,7 @@ idx_hit = (all_rays_array(:,2) == 1);
 idx_dust = (all_rays_array(:,1) == 1);
 idx_hit_dust = idx_hit & idx_dust;
 idx_hit_nodust = idx_hit & ~idx_dust;
+idx_hit_total = idx_hit;
 
 % Extract coordinates
 lat_hit = all_rays_lat_long(idx_hit,1);
@@ -393,16 +396,21 @@ lat_dust = all_rays_lat_long(idx_hit_dust,1);
 lon_dust = all_rays_lat_long(idx_hit_dust,2);
 lat_nodust = all_rays_lat_long(idx_hit_nodust,1);
 lon_nodust = all_rays_lat_long(idx_hit_nodust,2);
+lat_total = all_rays_lat_long(idx_hit_total,1);
+lon_total = all_rays_lat_long(idx_hit_total,2);
 
 % Define 10x10° grid edges and centers
-lon_edges = -180:10:180;
-lat_edges = -90:10:90;
+delta_lon = 10; % [deg]
+delta_lat = 10; % [deg]
+lon_edges = -180:delta_lon:180;
+lat_edges = -90:delta_lat:90;
 lon_centers = lon_edges(1:end-1) + diff(lon_edges)/2;
 lat_centers = lat_edges(1:end-1) + diff(lat_edges)/2;
 
 % Ray count
-[counts_total, ~, ~] = histcounts2(lat_hit, lon_hit, lat_edges, lon_edges);
+[counts_nodust, ~, ~] = histcounts2(lat_nodust, lon_nodust, lat_edges, lon_edges);
 [counts_dust, ~, ~]  = histcounts2(lat_dust, lon_dust, lat_edges, lon_edges);
+[counts_total, ~, ~]  = histcounts2(lat_total, lon_total, lat_edges, lon_edges);
 
 % Load background map
 I = imread('earth.png');
@@ -421,14 +429,14 @@ else
 end
 
 % Overlay heatmap of total rays per cell
-h_counts = imagesc([-180 180], [-90 90], counts_total);
+h_counts = imagesc([-180 180], [-90 90], counts_nodust);
 set(ax,'YDir','normal');
 alpha(h_counts, 0.35);
 colormap(parula)
 colorbar
-caxis([0 max(counts_total(:))]);
+caxis([0 max(counts_nodust(:))]);
 % title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
-title(['Date = ',time_utc,', Solar Rays hitting Earth with an Obstruction Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Rays hitting Earth with an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
 xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
 axis equal
 xlim([-180 180]); ylim([-90 90]);
@@ -449,7 +457,7 @@ end
 
 for r = 1:length(lat_centers)
     for c = 1:length(lon_centers)
-        n = counts_total(r,c);
+        n = counts_nodust(r,c);
         if n > 0 % Zeros are skipped
             ndust = counts_dust(r,c);
             text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
@@ -471,3 +479,203 @@ saveas(fig3, replace(['Mercator_Rays_',num2str(num_rays),'_Radius_',num2str(roun
 fprintf('Total rays that hit Earth: %d\n', sum(idx_hit));
 fprintf('  → Through dust cloud: %d\n', sum(idx_hit_dust));
 fprintf('  → Without dust cloud: %d\n', sum(idx_hit_nodust));
+
+%% Plot Intensity
+
+area_grid_cells = 0*counts_total; 
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+
+        this_lat_lower_edge = lat_edges(r);
+        this_lat_upper_edge = lat_edges(r+1);
+
+        area_grid_cells(r,c) = radius_Earth^2 * deg2rad(delta_lon) * (sind(this_lat_upper_edge) - sind(this_lat_lower_edge) ) * 1e6; % [m^2]
+        
+    end
+end
+
+% sum(sum(area_grid_cells)) = 4*pi*radius_Earth^2 = 5.1006e+14 km^2
+
+total_energy_from_Sun_to_Earth = solar_constant_Earth * pi * radius_Earth^2 * 1e6; % [W]
+
+energy_per_ray = total_energy_from_Sun_to_Earth/sum(idx_hit_total);  % [W]
+
+intensity_total = energy_per_ray * counts_total ./area_grid_cells; % [W/m^2]
+
+intensity_SRM = (energy_per_ray * counts_nodust ./area_grid_cells) + (energy_per_ray * factor_dimming_obstruction * counts_dust ./area_grid_cells); % [W/m^2]
+
+intensity_diff = intensity_total - intensity_SRM; % [W/m^2]
+
+% Create figure
+fig3 = figure('Name','Solar Intensity without Obstruction','Color',[1 1 1]);
+clc
+set(fig3,'units','normalized','outerposition',[0.4 0 0.6 0.65])
+ax = gca; hold on
+
+% Background map
+if ~isempty(I)
+    imagesc([-180 180], [-90 90], flipud(I));
+    set(ax,'YDir','normal');
+else
+    xlim([-180 180]); ylim([-90 90]);
+end
+
+% Overlay heatmap of total rays per cell
+h_counts = imagesc([-180 180], [-90 90], intensity_total);
+set(ax,'YDir','normal');
+alpha(h_counts, 0.35);
+colormap(parula)
+a = colorbar;
+a.Label.String = 'Solar Intensity [W/m^2]';
+caxis([0 max(intensity_total(:))]);
+
+% title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Intensity on Earth, without any Obstruction'], 'FontWeight','bold')
+xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
+axis equal
+xlim([-180 180]); ylim([-90 90]);
+
+% Overlay 10° white grid
+for lonV = lon_edges
+    plot([lonV lonV], [-90 90], 'w', 'LineWidth', 0.5);
+end
+for latH = lat_edges
+    plot([-180 180], [latH latH], 'w', 'LineWidth', 0.5);
+end
+
+% Annotate number of rays per cell (counts_total)
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+        n = round(intensity_total(r,c));
+        if n > 0 % Zeros are skipped
+            ndust = counts_dust(r,c);
+            text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
+                'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+                'FontSize',7, 'FontWeight','bold', 'Color','w', ...
+                'BackgroundColor',[0 0 0 0.4], 'Margin',1);
+        end
+    end
+end
+
+set(gca,'FontSize',14, 'FontName','Times New Roman')
+
+% Save figure
+saveas(fig3, replace(['Intensity_no_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
+
+
+% Create figure
+fig3 = figure('Name','Solar Intensity with SRM Obstruction','Color',[1 1 1]);
+clc
+set(fig3,'units','normalized','outerposition',[0 0 0.6 0.65])
+ax = gca; hold on
+
+% Background map
+if ~isempty(I)
+    imagesc([-180 180], [-90 90], flipud(I));
+    set(ax,'YDir','normal');
+else
+    xlim([-180 180]); ylim([-90 90]);
+end
+
+% Overlay heatmap of total rays per cell
+h_counts = imagesc([-180 180], [-90 90], intensity_SRM);
+set(ax,'YDir','normal');
+alpha(h_counts, 0.35);
+colormap(parula)
+a = colorbar;
+a.Label.String = 'Solar Intensity [W/m^2]';
+caxis([0 max(intensity_SRM(:))]);
+
+% title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Intensity on Earth with an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
+axis equal
+xlim([-180 180]); ylim([-90 90]);
+
+% Overlay 10° white grid
+for lonV = lon_edges
+    plot([lonV lonV], [-90 90], 'w', 'LineWidth', 0.5);
+end
+for latH = lat_edges
+    plot([-180 180], [latH latH], 'w', 'LineWidth', 0.5);
+end
+
+% Annotate number of rays per cell (counts_total)
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+        n = round(intensity_SRM(r,c));
+        if n > 0 % Zeros are skipped
+            ndust = counts_dust(r,c);
+            text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
+                'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+                'FontSize',7, 'FontWeight','bold', 'Color','w', ...
+                'BackgroundColor',[0 0 0 0.4], 'Margin',1);
+        end
+    end
+end
+
+set(gca,'FontSize',14, 'FontName','Times New Roman')
+
+% Save figure
+saveas(fig3, replace(['Intensity_with_SRM_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
+
+
+% Create figure
+fig3 = figure('Name','Solar Intensity Difference due to SRM Obstruction','Color',[1 1 1]);
+clc
+set(fig3,'units','normalized','outerposition',[0 0.3 0.6 0.65])
+ax = gca; hold on
+
+% Background map
+if ~isempty(I)
+    imagesc([-180 180], [-90 90], flipud(I));
+    set(ax,'YDir','normal');
+else
+    xlim([-180 180]); ylim([-90 90]);
+end
+
+% Overlay heatmap of total rays per cell
+h_counts = imagesc([-180 180], [-90 90], intensity_diff);
+set(ax,'YDir','normal');
+alpha(h_counts, 0.35);
+colormap(parula)
+a = colorbar;
+a.Label.String = 'Solar Intensity [W/m^2]';
+caxis([0 max(intensity_diff(:))]);
+
+% title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
+title(['Date = ',time_utc,', Solar Intensity Difference due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
+axis equal
+xlim([-180 180]); ylim([-90 90]);
+
+% Overlay 10° white grid
+for lonV = lon_edges
+    plot([lonV lonV], [-90 90], 'w', 'LineWidth', 0.5);
+end
+for latH = lat_edges
+    plot([-180 180], [latH latH], 'w', 'LineWidth', 0.5);
+end
+
+% Annotate number of rays per cell (counts_total)
+
+for r = 1:length(lat_centers)
+    for c = 1:length(lon_centers)
+        n = round(intensity_diff(r,c));
+        if n > 0 % Zeros are skipped
+            ndust = counts_dust(r,c);
+            text(lon_centers(c), lat_centers(r), sprintf('%d', n), ...
+                'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+                'FontSize',7, 'FontWeight','bold', 'Color','w', ...
+                'BackgroundColor',[0 0 0 0.4], 'Margin',1);
+        end
+    end
+end
+
+set(gca,'FontSize',14, 'FontName','Times New Roman')
+
+% Save figure
+saveas(fig3, replace(['Intensity_with_SRM_Obstruction_Rays',num2str(num_rays),'_Radius_',num2str(round(radius_obstruction)),'_Date_',time_utc,'.png'],':','_'));
