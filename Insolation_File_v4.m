@@ -85,11 +85,14 @@ temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 
 radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
-% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 10.3219%  
-% factor_dimming_obstruction = 1 - 0.103219;
+% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2828% for 1.16% reduction in solar intensity 
+% factor_dimming_obstruction = 1 - 0.132828;
 
-radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%  
-factor_dimming_obstruction = 0;
+radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
+factor_dimming_obstruction = 1 - 0.132485;
+
+% radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%  
+% factor_dimming_obstruction = 0;
 
 %% Rotation Matrix for Ray
 
@@ -200,10 +203,10 @@ for i=1:1:num_rays
                     intensity = 1 - u*(1 - mu); % brightness factor
 
                     % Rejection sampling - keep rays probability proportional to intensity
-                    if rand > intensity
+                    if rand <= intensity
                         flag_rand_variables = 1;
                     else
-                        flag_rand_variables = 0; % reject dimmer rays at the limb
+                        flag_rand_variables = 0; % reject brighter rays at the limb
                     end
                 end
             end
@@ -301,7 +304,7 @@ end
 
 disp(['Rays hitting Earth = ',num2str(100*sum(all_rays_array(:,2) == 1)/num_rays),' % ']) % Approx 46%
 
-disp(['Rays hitting Earth and Dust Cloud = ',num2str(100*sum( (all_rays_array(:,2) == 1) & (all_rays_array(:,1) == 1) )/num_rays),' % ']) % Approx 17%
+disp(['Rays hitting Earth and Obstruction = ',num2str(100*sum( (all_rays_array(:,2) == 1) & (all_rays_array(:,1) == 1) )/num_rays),' % ']) % Approx 17%
 
 %% Find Latitude and Longitude
 
@@ -341,7 +344,7 @@ toc % Stop stopwatch timer
 
 plot_handle = figure(1);
 clf
-set(plot_handle, 'Name','Mission Dashboard')
+set(plot_handle, 'Name','Ray Tracing')
 set(plot_handle,'Color',[1 1 1]);
 set(plot_handle,'units','normalized','outerposition',[0 0 0.5 0.5])
 set(plot_handle,'PaperPositionMode','auto');
@@ -707,7 +710,7 @@ a.Label.String = 'Fraction Solar Intensity Reduction [%]';
 caxis([0 max(fraction_intensity_reduction_SRM(:))]);
 
 % title(sprintf('Solar Rays hitting Earth with a Dust Cloud (%s)', time_utc), 'FontWeight','bold')
-title(['Date = ',time_utc,', Solar Intensity Reduction due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
+title(['Date = ',time_utc,', Fraction (%) Solar Intensity Reduction due to an Obstruction of Radius = ',num2str(radius_obstruction),' km at SEL_1'], 'FontWeight','bold')
 xlabel('Longitude [deg]'); ylabel('Latitude [deg]');
 axis equal
 xlim([-180 180]); ylim([-90 90]);
