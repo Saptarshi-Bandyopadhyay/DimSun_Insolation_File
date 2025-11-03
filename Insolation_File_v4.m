@@ -85,11 +85,11 @@ temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 
 radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
-% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2828% for 1.16% reduction in solar intensity 
-% factor_dimming_obstruction = 1 - 0.132828;
+radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 12.5398% for 1.16% reduction in solar intensity 
+factor_dimming_obstruction = 1 - 0.125398;
 
-radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
-factor_dimming_obstruction = 1 - 0.132485;
+% radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
+% factor_dimming_obstruction = 1 - 0.132485;
 
 % radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%  
 % factor_dimming_obstruction = 0;
@@ -197,10 +197,17 @@ for i=1:1:num_rays
 
                 if r_norm < 1
 
-                    % Reject dimmer rays
-                    u = 0.5; % limb darkening coefficient
-                    mu = sqrt(1 - r_norm^2);
-                    intensity = 1 - u*(1 - mu); % brightness factor
+                    % % Reject brighter rays
+                    % u = 0.5; % limb darkening coefficient
+                    % mu = sqrt(1 - r_norm^2);
+                    % intensity = 1 - u*(1 - mu); % brightness factor
+
+                    % Second method: https://en.wikipedia.org/wiki/Limb_darkening 
+                    phi = asind(r_norm); % [deg]
+                    a0 = 0.3;
+                    a1 = 0.93;
+                    a2 = -0.23;
+                    intensity = a0 + (a1 * cosd(phi)) + (a2 * cosd(phi) * cosd(phi));
 
                     % Rejection sampling - keep rays probability proportional to intensity
                     if rand <= intensity
@@ -208,6 +215,7 @@ for i=1:1:num_rays
                     else
                         flag_rand_variables = 0; % reject brighter rays at the limb
                     end
+                    
                 end
             end
 
