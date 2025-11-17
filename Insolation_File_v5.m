@@ -77,7 +77,10 @@ solar_constant_Earth = solar_luminosity/(4*pi*(distance_Sun_Earth^2)* 1e6); % [W
 
 %% Outer radius at Dust Cloud location
 
-x_location = distance_Sun_L1; % [km] Location of Dust Cloud
+% x_location = distance_Sun_L1; % [km] Location of Obstruction
+
+distance_Earth_L1_Dean = 2.36e6; % [km]
+x_location = distance_Sun_Earth - distance_Earth_L1_Dean; % [km]
 
 temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
 
@@ -89,8 +92,11 @@ radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_lo
 % radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
 % factor_dimming_obstruction = 1 - 0.132485;
 
-radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%
-factor_dimming_obstruction = 0;
+% radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%
+% factor_dimming_obstruction = 0;
+
+radius_obstruction = 2000; % [km] -> Architecture A: From Dean. Reduction in blue ray intensity by 50% because 5000SC 20km-radius are inside this region. 
+factor_dimming_obstruction = 0.125; % = 0.25*(pi*20^2)*5000/(pi*2000^2)  
 
 %% Rotation Matrix for Ray
 
