@@ -76,6 +76,7 @@ Matlab_date_array = datetime(2025,1,1) + days(time_array/86400);
 % Preallocate arrays
 N = length(time_date_array);
 Earth_pos_J2000 = zeros(N,3);
+omega_Earth_J2000 = zeros(N,1);
 L1_pos_J2000 = zeros(N,3);
 distance_Sun_Earth = zeros(N,1);
 distance__L1 = zeros(N,1);
@@ -90,6 +91,18 @@ for i = 1:N
     state = cspice_spkezr('EARTH', et, 'J2000', 'NONE', 'SUN');
     Earth_pos = state(1:3)'; % [km]
     Earth_pos_J2000(i,:) = Earth_pos;
+
+    % Earth Omega
+    Earth_velocity = state(4:6)'; % [km/sec]
+
+    Sun_pos_normalized = func_normalize_vec(-Earth_pos);
+    Earth_velocity_normalized = func_normalize_vec(Earth_velocity);
+    Sun_pos_Earth_velocity_angle = rad2deg(func_angle_between_vectors(Sun_pos_normalized', Earth_velocity_normalized')); % [rad]
+
+    Earth_velocity_normal_plane = Earth_velocity*(sind(Sun_pos_Earth_velocity_angle));
+
+    omega_Earth = norm(Earth_velocity_normal_plane)/norm(Earth_pos); % [rad/s]
+    omega_Earth_J2000(i,1) = omega_Earth; % [rad/s]
 
     % Sun–Earth distance
     r_SE_km = norm(Earth_pos);
@@ -291,6 +304,39 @@ title('Evolution of the Solar Constant on Earth over the Year');
 set(gca, 'FontSize', 14, 'FontName', 'Times New Roman');
 
 saveas(plot_name, 'Solar_Constant_Earth.png');
+
+
+%% Plot Earth Omega
+
+plot_name = figure();
+clc
+set(plot_name,'units','normalized','outerposition',[0 0 1 1])
+
+yyaxis left
+p6 = plot(Matlab_date_array, omega_Earth_J2000, '-', 'LineWidth', 2);
+xlabel('Date');
+ylabel('Omega Earth [rad/sec]');
+grid on;
+
+ylim_diff = max(omega_Earth_J2000) - min(omega_Earth_J2000);
+ylim([min(omega_Earth_J2000) - ylim_diff/10, ...
+    max(omega_Earth_J2000) + ylim_diff/10]);
+
+
+yyaxis right
+dist_frac = omega_Earth_J2000 ./ min(omega_Earth_J2000);
+p5 = plot(Matlab_date_array, dist_frac, '--', 'LineWidth', 3);
+ylabel('(Solar Constant) / Min(Solar Constant)');
+
+ylim_diff = max(dist_frac) - min(dist_frac);
+ylim([min(dist_frac) - ylim_diff/10, max(dist_frac) + ylim_diff/10]);
+
+title('Evolution of the Omega Earth over the Year');
+
+set(gca, 'FontSize', 14, 'FontName', 'Times New Roman');
+
+saveas(plot_name, 'Omega_Earth.png');
+
 
 
 toc % Stop stopwatch timer

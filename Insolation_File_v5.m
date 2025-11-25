@@ -36,7 +36,9 @@ cspice_furnsh([path_to_MuSCAT_Supporting_Files,'SPICE/pck00011.tpc']);
 
 %% Initialize Simulation
 
-time_utc = '2025-12-21T12:00:00'; % this_time_utc
+% time_utc = '2025-12-21T12:00:00'; % this_time_utc
+time_utc = '2025-01-01T12:00:00'; % Perihelion
+% time_utc = '2025-07-04T12:00:00'; % Aphelion
 
 num_rays = 1e7; % this_num_rays
 
@@ -55,6 +57,18 @@ state = cspice_spkezr('EARTH', et_t, 'J2000', 'NONE', 'SUN');
 Earth_pos = state(1:3)'; % [km]
 
 distance_Sun_Earth = norm(Earth_pos); % [km]
+
+% Earth Omega
+Earth_velocity = state(4:6)'; % [km/sec]
+
+Sun_pos_normalized = func_normalize_vec(-Earth_pos);
+Earth_velocity_normalized = func_normalize_vec(Earth_velocity);
+Sun_pos_Earth_velocity_angle = rad2deg(func_angle_between_vectors(Sun_pos_normalized', Earth_velocity_normalized')); % [rad]
+
+Earth_velocity_normal_plane = Earth_velocity*(sind(Sun_pos_Earth_velocity_angle));
+
+omega_Earth = norm(Earth_velocity_normal_plane)/norm(Earth_pos); % [rad/s]
+
 
 % Solve for Sun-Earth L1 point
 
@@ -77,26 +91,61 @@ solar_constant_Earth = solar_luminosity/(4*pi*(distance_Sun_Earth^2)* 1e6); % [W
 
 %% Outer radius at Dust Cloud location
 
-% x_location = distance_Sun_L1; % [km] Location of Obstruction
+flag_architecture = 'DimSun (Architecture E) 0.9percent reduction';
 
-distance_Earth_L1_Dean = 2.36e6; % [km]
-x_location = distance_Sun_Earth - distance_Earth_L1_Dean; % [km]
+switch flag_architecture
 
-temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
+    case 'DimSun (Architecture E) 0.9percent reduction'
+        
+        x_location = distance_Sun_L1; % [km] Location of Obstruction
 
-radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
+        temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
+        radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
 
-% radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 12.5398% for 1.16% reduction in solar intensity
-% factor_dimming_obstruction = 1 - 0.125398;
+        radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
+        factor_dimming_obstruction = 1 - 0.132485;
 
-% radius_obstruction = 1.8555e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 13.2485% for 0.9% reduction in solar intensity
-% factor_dimming_obstruction = 1 - 0.132485;
 
-% radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%
-% factor_dimming_obstruction = 0;
+    case 'DimSun (Architecture E) 1.16percent reduction'
 
-radius_obstruction = 2000; % [km] -> Architecture A: From Dean. Reduction in blue ray intensity by 50% because 5000SC 20km-radius are inside this region. 
-factor_dimming_obstruction = 0.125; % = 0.25*(pi*20^2)*5000/(pi*2000^2)  
+        x_location = distance_Sun_L1; % [km] Location of Obstruction
+
+        temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
+        radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
+
+        radius_obstruction = 2.1206e+03; % [km] Architecture E: From Dust_Cloud_Mass_Marks_Equations.m, line 549. Reduction in blue ray intensity by 12.5398% for 1.16% reduction in solar intensity
+        factor_dimming_obstruction = 1 - 0.125398;
+
+
+    case 'Architecture A (from Dean)'
+
+        distance_Earth_L1_Dean = 2.36e6; % [km]
+        x_location = distance_Sun_Earth - distance_Earth_L1_Dean; % [km]
+
+        temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
+        radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
+
+        radius_obstruction = 2000; % [km] -> Architecture A: From Dean. Reduction in blue ray intensity by 50% because 5000SC 20km-radius are inside this region. 
+        factor_dimming_obstruction = 0.125; % = 0.25*(pi*20^2)*5000/(pi*2000^2)
+
+
+    case 'Architecture A (from Jeff)'
+
+        x_location = distance_Sun_L1; % [km] Location of Obstruction
+
+        temp_x = (distance_Sun_Earth * radius_Earth)/(radius_Sun - radius_Earth); % [km]
+        radius_location = (radius_Earth / temp_x ) * (temp_x + distance_Sun_Earth - x_location); % [km]
+
+        radius_obstruction = 970; % [km] -> Architecture A: From Jeff. Reduction in blue ray intensity by 100%
+        factor_dimming_obstruction = 0;
+
+    otherwise
+        error('Should not reach here!')
+
+end
+
+
+
 
 %% Rotation Matrix for Ray
 
